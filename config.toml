@@ -1,0 +1,116 @@
+[city]
+slug = "huron"
+name = "Huron County"
+# Fire and Emergency Response Zones: 17 named polygons ("Goderich Fire
+# Dept", "Bayfield Fire Dept" …), point-tested 2026-08-16 per
+# 04-city-onboarding.md at 99.99% of the 38,312 snapshot-26 rows — finer
+# and more legible than the 9-polygon lower-tier fabric (99.97%, the
+# runner-up) and the right granularity for 38k rows (~2,250 per tile).
+# The settlement trap struck a third time: Urban_Area (88 polygons, the
+# best-LOOKING fabric) point-tests at 62.36% — rural addresses excluded.
+# County_Tracts is county FOREST tracts (0.05%), not census tracts.
+# HC_LowerTiers/Municipal_Boundary (9) matches the Mun field if a
+# per-municipality fabric is ever wanted; HuronCounty_Boundary is the
+# future 10-boundary-clipping.md input, noted so it isn't re-discovered.
+neighbourhoods_url = "https://services1.arcgis.com/Nl1VlZHemqspPW1n/arcgis/rest/services/Fire_and_Emergency_Response_Zones/FeatureServer/0/query?where=1%3D1&outFields=Label&outSR=4326&f=geojson"
+neighbourhood_name_field = "Label"
+
+[source]
+sqlite_path = "C:/Users/kk/Code/ontario-address-changes/data/huron/huron.db"
+# Tracker is FRESH and the source is ALIVE: snapshot 26 (2026-08-08), rows
+# growing weekly (38,297 -> 38,301 -> 38,312 across late July/August 2026)
+# — the county actively maintains this layer. Not in the stall cluster.
+
+# Per-city projection recipe (multi-city Tier 2), measured against snapshot
+# 26 (2026-08-08, 38,312 rows; no stable key — HuronID is a contiguous
+# resequenced counter, synthetic identities).
+[source_fields]
+# StreetNumber already fuses the numeric Add_Number with AddNum_Suf
+# ("39835B") — the suffix survives the tracker here, unlike Brant/Oakville,
+# so the plain number column is correct. 39 of 38,176 numbered rows
+# disagree with FullAddress's leading token (QA finds). 136 rows have no
+# number at all (TODO §8, third consumer — unnamed-feature stubs).
+# number_from stays default ("number").
+# StreetName is the TYPED, mixed-case street ("Alexander Street East") —
+# the NENA-style component fields (St_Name bare, St_PosTyp, St_PosDir)
+# ride in props. No derivation needed; the tracker street is
+# conflation-ready here, a portfolio rarity.
+street_from = "street"
+# NOT "full": FullAddress is ALL-CAPS and embeds the unit in a suffix form
+# that even reorders ("111 ANGLESEA STREET 5 APT" for unit "APT 5") — the
+# Guelph distinct-count trap plus a shouting-case problem in one field.
+# Synthesizing keeps full mixed-case and unit-free (and dodges TODO §9
+# entirely: nothing ALL-CAPS survives projection).
+full_from = "number+street"
+# 9 lower-tier municipalities, 100% populated — load-bearing for collapse
+# keying (street names repeat across the county: WILLIAM STREET appears in
+# several towns), review display, and any future addr:city decision.
+municipality = "props:Mun"
+# Tracker canonical column (source Unit), 4,215 rows (11.0%), values are
+# fused type+number ("APT 1", "UNIT 202"). Declaring it obliges the
+# [units] policy below.
+unit = "unit"
+# No status field, no postcode anywhere in the schema (14 props keys, all
+# accounted for 2026-08-16), no lo/hi ranges, no class. suffix_range stays
+# undeclared below.
+
+# Measured 2026-08-16 on snapshot 26: 38,176 numbered rows -> 34,530 civic
+# groups keyed (number, street, Mun); 654 stacked (deepest 174 units at
+# 36534 HURON ROAD, Central Huron — a park/complex), 541 of them with no
+# unit-less row to elect (lowest identity_key then), 10 groups with >1
+# unit-less rows (intra-source duplicates worth a look during review).
+# The Hamilton parcel-stack shape.
+[units]
+policy = "collapse-to-civic"
+
+[run_defaults]
+# Dense Goderich cell (1,549 rows) for first test runs.
+bbox = [43.736, -81.716, 43.748, -81.704]
+overpass_url = "https://overpass-api.de/api/interpreter"
+
+[osm]
+source = "local"
+# Same Ontario PBF as every city in the portfolio.
+pbf_url = "https://download.geofabrik.de/north-america/canada/ontario-latest.osm.pbf"
+# Source-data extent (38,312 rows measured 2026-08-16: lat 43.23811..
+# 44.05342, lon -81.77258..-80.95503) plus a small margin. West edge is
+# the Lake Huron shore; south abuts Lambton (lambton dataset) and east
+# abuts Wellington/Perth. See 10-boundary-clipping.md.
+city_bbox = [43.22, -81.79, 44.07, -80.94]
+extract_dir = "data/osm"
+
+[conflation]
+match_radius_m = 100
+match_near_m = 15
+
+[checks]
+match_far = true
+# suffix_range deliberately absent: no lo_num/hi_num in this source.
+city_duplicate = true
+missing_sample = true
+nearby_street_mismatch = true
+
+[check_params.city_duplicate]
+radius_m = 3.0
+
+[check_params.missing_sample]
+every_nth = 50
+
+[check_params.nearby_street_mismatch]
+radius_m = 20.0
+
+[check_params.match_number_drift]
+slack_m = 2.0
+
+[upload]
+changesets_per_minute = 1
+changeset_comment_template = "{city} Open Data address import, run={run_name}"
+
+[export]
+attribution = "County of Huron Open Data"
+# Onboarding only — no proposal exists. Licence is a verbatim-verified OGL
+# clone awaiting the LWG variant-review reply (drafted email, 2026-08-16);
+# NB the county GIS page shows a separate restrictive licence for
+# CONTRACTED products — the open-data grant covers this layer, but quote
+# the layer's own licence, not the site-wide page, in any proposal.
+import_plan = ""
